@@ -17,51 +17,62 @@ class UserController extends Controller
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {
-        $query = Post::with(['category','comments'])
+{
+    $query = Post::with(['category', 'comments', 'user'])
         ->withCount('comments')
-        ->when($request->search,function($query, $search){
-            $query-> where('title', 'like', "%{$search}%");
+        ->when($request->search, function ($query, $search) {
+            $query->where('title', 'like', "%{$search}%");
         })
-        ->when($request->filled('category') && $request->category != 'all', function($query) use ($request){
-            $query->where('category_id',(int) $request->category);
+        ->when($request->filled('category') && $request->category != 'all', function ($query) use ($request) {
+            $query->where('category_id', (int) $request->category);
         })
-        ->when($request->sort == 'most_commented', function($query){
+        ->when($request->sort == 'most_commented', function ($query) {
             $query->orderBy('comments_count', 'desc');
-        }, function($query){
+        }, function ($query) {
             $query->latest();
-        });
-        $posts = $query->paginate(10)->through(function ($post) {
-            return [
-                'id' => $post->id,
-                'title' => $post->title,
-                'content' => $post->content ?? '',
-                'category' => [
-                    'id' => $post->category->id,
-                    'name' => $post->category->name ?? '',
-                ],
-                'comments_count' => $post->comments_count,
-                'created_at' => $post->created_at?->toISOString() ?? '',
-            ];
+        })
+        ->when($request->boolean('only_my_posts'), function ($query) {
+            $query->where('user_id', auth()->id());
         });
 
-        $categories = Category::all()->map(function($category){
-            return [
-                'id' => $category->id,
-                'name' => $category->name,
-            ]; 
-        });
+    $posts = $query->paginate(10)->through(function ($post) {
+        return [
+            'id' => $post->id,
+            'title' => $post->title,
+            'content' => $post->content ?? '',
+            'category' => [
+                'id' => $post->category->id,
+                'name' => $post->category->name ?? '',
+            ],
+            'user' => [
+                'id' => $post->user->id ?? null,
+                'name' => $post->user->name ?? 'Unknown',
+                'email' => $post->user->email ?? '',
+            ],
+            'comments_count' => $post->comments_count,
+            'created_at' => $post->created_at?->toISOString() ?? '',
+        ];
+    });
 
-        return Inertia::render('user/posts', [
-            'posts'=>$posts,
-            'categories' => $categories,
-            'filters' => [
-                'search' => $request->search,
-                'category' => $request->category,
-                'sort' => $request->sort,
-            ],$request->only(['search', 'category', 'sort'])
-        ]);
-    }
+    $categories = Category::all()->map(function ($category) {
+        return [
+            'id' => $category->id,
+            'name' => $category->name,
+        ];
+    });
+
+    return Inertia::render('user/posts', [
+        'posts' => $posts,
+        'categories' => $categories,
+        'filters' => [
+            'search' => $request->search,
+            'category' => $request->category,
+            'sort' => $request->sort,
+            'only_my_posts' => $request->boolean('only_my_posts'),
+        ],
+    ]);
+}
+
     
 
     /**
@@ -69,7 +80,8 @@ class UserController extends Controller
      */
     public function create()
     {
-        //
+        $categories = Category::all();
+        return Inertia::render('user/post-create', compact('categories'));
     }
 
     /**
@@ -77,7 +89,23 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        //
+         $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
+            'category_id' => 'required|exists:categories,id',
+            'published_at' => 'nullable|date',
+        ]);
+
+        if ($request->filled('published_at')) {
+            $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
+        }
+
+        $validated['slug'] = Str::slug($request->title);
+        $validated['user_id'] = auth()->id();
+
+        Post::create($validated);
+
+        return redirect()->route('user.posts.index')->with('success', 'Post created successfully.');
     }
 
     /**
@@ -119,9 +147,11 @@ class UserController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit($id)
     {
-        //
+        $post = Post::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+        $categories = Category::all();
+        return Inertia::render('user/post-edit', compact('post', 'categories'));
     }
 
     /**
@@ -140,6 +170,32 @@ class UserController extends Controller
         return redirect()->back()
         ->with('success', 'Comment added successfully.');
     }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request,$id)
+    {
+         $post = Post::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
+            'category_id' => 'required|exists:categories,id',
+            'published_at' => 'nullable|date',
+        ]);
+
+        if ($request->filled('published_at')) {
+            $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
+        }
+
+        $validated['slug'] = Str::slug($request->title);
+
+        $post->update($validated);
+
+        return redirect()->route('user.posts.index')->with('success', 'Post updated successfully.');
+    }
+
     public function destroyComment(string $postId, string $commentId)
     {
         
@@ -154,8 +210,11 @@ class UserController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //
+         $post = Post::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
+        $post->delete();
+
+        return redirect()->route('user.posts.index')->with('success', 'Post deleted successfully.');
     }
 }

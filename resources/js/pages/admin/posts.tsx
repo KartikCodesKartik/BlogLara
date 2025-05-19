@@ -151,17 +151,19 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
+        setIsSubmitting(true);
         if (editPost) {
             router.put(`/admin/posts/${editPost.id}`, formData, {
                 onSuccess: () => {
                     setShowModal(false);
+                    setIsSubmitting(false);
                     toast.success('Post updated successfully', {
                         duration: 3000,
                         position: 'top-right',
                     });
                 },
                 onError: () => {
+                    setIsSubmitting(false);
                     toast.error('Failed to update post', {
                         duration: 3000,
                         position: 'top-right',
@@ -172,12 +174,14 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
             router.post('/admin/posts', formData, {
                 onSuccess: () => {
                     setShowModal(false);
+                    setIsSubmitting(false);
                     toast.success('Post created successfully', {
                         duration: 3000,
                         position: 'top-right',
                     });
                 },
                 onError: () => {
+                    setIsSubmitting(false);
                     toast.error('Failed to create post', {
                         duration: 3000,
                         position: 'top-right',
@@ -213,6 +217,7 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
         setSelectedPost(post);
         setShowCommentsModal(true);
     };
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -220,8 +225,11 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
             <Toaster richColors closeButton />
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl font-bold">Posts</h1>                    <Button onClick={handleAdd}>
-                        Add  Blog                     </Button>                </div>
+                    <h1 className="text-2xl font-bold">Posts</h1>
+                        <Button onClick={handleAdd}>
+                                Add  Blog                     
+                        </Button>           
+                        </div>
                 <div className="rounded-md border">
                     <Table>
                         <TableHeader>
@@ -307,30 +315,41 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
                                 <div className="text-center py-4 text-gray-500">
                                     No comments yet                                </div>)}
                         </div>
-                    </DialogContent>                </Dialog>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Add/Edit Post Modal */}
                 <Dialog open={showModal} onOpenChange={setShowModal}>
                     <DialogContent className="sm:max-w-[425px]">
                         <DialogHeader>
-                            <DialogTitle>{editPost ? 'Edit Blog' : 'Add Blog'}</DialogTitle>                            <DialogDescription>
-                                {editPost ? 'Make changes to your blog post here.' : 'Create a new blog post here.'}
-                            </DialogDescription>                        </DialogHeader>                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="title">Title</Label>                                <Input id="title"
+                            <DialogTitle>{editPost ? 'Edit Blog' : 'Add Blog'}</DialogTitle>  
+                            <DialogDescription>
+                            {editPost ? 'Make changes to your blog post here.' : 'Create a new blog post here.'}
+                            </DialogDescription> 
+                            </DialogHeader>
+                            <form onSubmit={handleSubmit}
+                             className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Title</Label>
+                                    <Input id="title"
                                     name="title"
                                     value={formData.title}
                                     onChange={handleInputChange}
                                     required />
-                            </div>
+                                </div>
                             <div className="space-y-2">
-                                <Label htmlFor="content">Content</Label>                                <Textarea id="content"
+                                <Label htmlFor="content">Content</Label>
+                                <Textarea id="content"
                                     name="content"
                                     value={formData.content}
                                     onChange={handleInputChange}
                                     required className="min-h-[100px]"
                                 />
                             </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="category">Category</Label>                                <Select
+                                <Label htmlFor="category">Category</Label>                                
+                                <Select
                                     value={formData.category_id}
                                     onValueChange={(value) => handleSelectChange('category_id', value)}
                                 >
@@ -341,9 +360,13 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
                                             <SelectItem key={category.id} value={category.id.toString()}>
                                                 {category.name}
                                             </SelectItem>))}
-                                    </SelectContent>                                </Select>                            </div>
+                                    </SelectContent>
+                                  </Select>
+                                  </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="published_at">Published At</Label>                                <Input id="published_at"
+                                <Label htmlFor="published_at">Published At</Label>
+                                <Input id="published_at"
                                     name="published_at"
                                     type="datetime-local"
                                     value={formData.published_at}
@@ -353,9 +376,17 @@ export default function PostsPage({ posts, categories }: PostsPageProps) {
 
                             <DialogFooter>
                                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                                    Cancel                                 </Button>                                <Button type="submit">
+                                    Cancel 
+                                </Button>                               
+                                 <Button type="submit" disabled={isSubmitting}>
                                     {editPost ? 'Update' : 'Create'}
-                                </Button>                            </DialogFooter>                        </form>                    </DialogContent>                </Dialog>            </div>        </AppLayout>);
+                                </Button>            
+                            </DialogFooter>
+                        </form>                    
+                    </DialogContent>                
+                </Dialog> 
+            </div>        
+        </AppLayout>);
 }
 
 

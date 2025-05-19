@@ -110,7 +110,7 @@ export default function PostShow({ post }: PostShowProps) {
                         <span>{post.comments_count} comments</span>
                     </div>
                     
-                    <div className="prose max-w-none mb-8">
+                    <div className="prose max-w-none mb-8 whitespace-pre-line">
                         {post.content}
                     </div>
 
@@ -120,13 +120,14 @@ export default function PostShow({ post }: PostShowProps) {
                         
                         {/* Add Comment Form */}
                         <form onSubmit={handleSubmitComment} className="mb-8">
-                            <Textarea
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                placeholder="Write a comment..."
-                                className="mb-2"
-                                required
+                          <Textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="Write a comment..."
+                            className="mb-2 resize-none overflow-y-auto h-32"
+                            required
                             />
+
                             <Button type="submit">Post Comment</Button>
                         </form>
 

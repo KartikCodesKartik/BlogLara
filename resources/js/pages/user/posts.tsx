@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -13,6 +14,18 @@ import {
 } from "@/components/ui/select";
 import { toast, Toaster } from "sonner";
 import { CalendarDays, MessageSquare, Tag } from 'lucide-react';
+import { User as UserIcon,Trash2 } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import {usePage} from "@inertiajs/react";
 
 interface Post {
     id: number;
@@ -21,6 +34,12 @@ interface Post {
     category: {
         id: number;
         name: string;
+    };
+     user: {
+        id: number;
+        name: string;
+        email: string;
+        role: string;
     };
     comments_count: number;
     created_at: string;
@@ -51,6 +70,7 @@ interface PostsPageProps {
         search?: string;
         category?: string;
         sort?: string;
+        only_my_posts?: boolean;
     };
 }
 
@@ -87,9 +107,24 @@ export default function PostsPage({
     categories = [], 
     filters = defaultFilters 
 }: PostsPageProps) {
+    const [showModal, setShowModal] = useState(false);
     const [search, setSearch] = useState(filters?.search ?? '');
     const [selectedCategory, setSelectedCategory] = useState(filters?.category ?? 'all');
     const [sortBy, setSortBy] = useState(filters?.sort ?? 'latest');
+    const [editPost, setEditPost] = useState<Post | null>(null);
+     const [formData, setFormData] = useState({
+            title: '',
+            content: '',
+            category_id: '',
+            published_at: '',
+        });
+        const [onlyMyPosts, setOnlyMyPosts] = useState(filters?.only_my_posts ?? false);
+
+    console.log('from log:',posts.data[0]);
+    const {auth} = usePage().props;
+    const user = auth.user;
+    console.log('user:',user);
+    
 
     const handleSearch = (value: string) => {
         setSearch(value);
@@ -118,13 +153,20 @@ export default function PostsPage({
     };
 
     const handleSortChange = (value: string) => {
-        setSortBy(value);
-        router.get(
-            route('user.posts.index'),
-            { search, category: selectedCategory, sort: value },
-            { preserveState: true, preserveScroll: true }
-        );
-    };
+    const isOnlyMyPosts = value === 'only_my_posts';
+    setOnlyMyPosts(isOnlyMyPosts);
+    setSortBy(value); // Keep sortBy as the selected value
+    router.get(
+        route('user.posts.index'),
+        { 
+            search, 
+            category: selectedCategory, 
+            sort: isOnlyMyPosts ? 'latest' : value, // Send 'latest' for sort when My Blogs is selected
+            only_my_posts: isOnlyMyPosts ? 'true' : '' 
+        },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+};
 
     const handlePageChange = (page: number) => {
         router.get(
@@ -134,6 +176,90 @@ export default function PostsPage({
         );
     };
 
+     const handleAdd = () => {
+        setEditPost(null);
+        setFormData({
+            title: '',
+            content: '',
+            category_id: '',
+            published_at: '',
+        });
+        setShowModal(true);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (editPost) {
+            router.put(`/user/posts/${editPost.id}`, formData, {
+                onSuccess: () => {
+                    setShowModal(false);
+                    toast.success('Post updated successfully', {
+                        duration: 3000,
+                        position: 'top-right',
+                    });
+                },
+                onError: () => {
+                    toast.error('Failed to update post', {
+                        duration: 3000,
+                        position: 'top-right',
+                    });
+                },
+            });
+        } else {
+            router.post('/user/posts', formData, {
+                onSuccess: () => {
+                    setShowModal(false);
+                    toast.success('Post created successfully', {
+                        duration: 3000,
+                        position: 'top-right',
+                    });
+                },
+                onError: () => {
+                    toast.error('Failed to create post', {
+                        duration: 3000,
+                        position: 'top-right',
+                    });
+                },
+            });
+        }
+    };
+
+      const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+     const handleSelectChange = (name: string, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleDelete = (id: number) => {
+            if (confirm('Are you sure you want to delete this post?')) {
+                router.delete(`/user/posts/${id}`, {
+                    onSuccess: () => {
+                        toast.success('Post deleted successfully', {
+                            duration: 3000,
+                            position: 'top-right',
+                        });
+                    },
+                    onError: () => {
+                        toast.error('Failed to delete post', {
+                            duration: 3000,
+                            position: 'top-right',
+                        });
+                    },
+                });
+            }
+        };
+
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Posts" />
@@ -141,6 +267,9 @@ export default function PostsPage({
             <div className="flex flex-col gap-4 p-4">
                 <div className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl font-bold">Posts</h1>
+                    <Button onClick={handleAdd}>
+                                                Add  Blog                     
+                                        </Button>  
                 </div>
 
                 {/* Filters */}
@@ -173,6 +302,7 @@ export default function PostsPage({
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="latest">Latest</SelectItem>
+                            <SelectItem value="only_my_posts">My Blogs</SelectItem>
                             <SelectItem value="most_commented">Most Commented</SelectItem>
                         </SelectContent>
                     </Select>
@@ -183,12 +313,17 @@ export default function PostsPage({
                     {Array.isArray(posts.data) && posts.data.map((post) => (
                         <div 
                             key={post.id} 
-                            className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden border border-gray-100"
+                            className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden border border-gray-100 relative"
                         >
                             <div className="p-6">
                                 <h2 className="text-xl font-semibold mb-3 line-clamp-2">
                                     {post.title || 'Untitled'}
                                 </h2>
+
+                                <div className="flex items-center gap-1">
+                                    <UserIcon className="w-4 h-4" />
+                                    <span>{post.user?.name ?? 'Unknown author'}</span>
+                                </div>
                                 
                                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
                                     <div className="flex items-center gap-1">
@@ -216,6 +351,12 @@ export default function PostsPage({
                                 >
                                     Read More
                                 </Button>
+                                {post.user.id === user.id && (
+                                    <Trash2 
+                                    className="w-5 h-5 text-red-500 hover:text-red-700 cursor-pointer absolute top-3 right-3" 
+                                    onClick={() => handleDelete(post.id)} 
+                                    />
+                                )}
                             </div>
                         </div>
                     ))}
@@ -277,6 +418,75 @@ export default function PostsPage({
                     </nav>
                 </div>
             </div>
+
+
+            {/* Modal for Add/Edit Post */}
+             <Dialog open={showModal} onOpenChange={setShowModal}>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>{editPost ? 'Edit Blog' : 'Add Blog'}</DialogTitle>  
+                            <DialogDescription>
+                            {editPost ? 'Make changes to your blog post here.' : 'Create a new blog post here.'}
+                            </DialogDescription> 
+                            </DialogHeader>
+                            <form onSubmit={handleSubmit}
+                             className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Title</Label>
+                                    <Input id="title"
+                                    name="title"
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    required />
+                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="content">Content</Label>
+                                <Textarea id="content"
+                                    name="content"
+                                    value={formData.content}
+                                    onChange={handleInputChange}
+                                    required className="min-h-[100px]"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Category</Label>                                
+                                <Select
+                                    value={formData.category_id}
+                                    onValueChange={(value) => handleSelectChange('category_id', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a category" />
+                                    </SelectTrigger>                                    <SelectContent>
+                                        {categories.map((category) => (
+                                            <SelectItem key={category.id} value={category.id.toString()}>
+                                                {category.name}
+                                            </SelectItem>))}
+                                    </SelectContent>
+                                  </Select>
+                                  </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="published_at">Published At</Label>
+                                <Input id="published_at"
+                                    name="published_at"
+                                    type="datetime-local"
+                                    value={formData.published_at}
+                                    onChange={handleInputChange}
+                                />
+                            </div>
+
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                                    Cancel 
+                                </Button>                               
+                                 <Button type="submit">
+                                    {editPost ? 'Update' : 'Create'}
+                                </Button>            
+                            </DialogFooter>
+                        </form>                    
+                    </DialogContent>                
+                </Dialog> 
         </AppLayout>
     );
 }

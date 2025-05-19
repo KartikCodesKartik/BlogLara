@@ -16,7 +16,7 @@ class PostController extends Controller
      */
     public function index()
     {
-         $posts = Post::with(['category','comments.user'])->withCount('comments')
+         $posts = Post::with(['category','comments.user','user'])->withCount('comments')
          ->latest()->paginate(10);
          $categories = Category::all();
         return Inertia::render('admin/posts', [
@@ -36,22 +36,27 @@ class PostController extends Controller
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'required|string|max:255',
-            'category_id' => 'required|exists:categories,id',
-            'published_at' => 'nullable|date',
-        ]);
+{
+    $validated = $request->validate([
+        'title' => 'required|string',
+        'content' => 'required|string',
+        'category_id' => 'required|exists:categories,id',
+        'published_at' => 'nullable|date',
+    ]);
 
-        if($request->filled('published_at')) {
-            $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
-        } 
-        $validated['slug'] = Str::slug($request->title);
-       Post::create($validated);
-        return redirect()->route('admin.posts.index')
-        ->with('success', 'Post added successfully.');
+    if ($request->filled('published_at')) {
+        $validated['published_at'] = Carbon::parse($request->published_at)->format('Y-m-d H:i:s');
     }
+
+    $validated['slug'] = Str::slug($request->title);
+    $validated['user_id'] = auth()->id(); // ✅ Associate post with current user
+
+    Post::create($validated);
+
+    return redirect()->route('admin.posts.index')
+        ->with('success', 'Post added successfully.');
+}
+
 
     /**
      * Display the specified resource.

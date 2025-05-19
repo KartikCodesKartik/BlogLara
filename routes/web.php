@@ -24,7 +24,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
 
 Route::prefix('user')->name('user.')->middleware(['auth', 'role:user'])->group(function(){
-    Route::resource('posts', UserController::class)->except(['show']);
+    Route::resource('posts', UserController::class);
     Route::get('posts/{id}', [UserController::class, 'show'])->name('posts.show');
     Route::post('posts/{id}/comments', [UserController::class, 'storeComment'])->name('posts.comments.store');
     Route::delete('posts/{postId}/comments/{commentId}', [UserController::class, 'destroyComment'])->name('posts.comments.destroy');
